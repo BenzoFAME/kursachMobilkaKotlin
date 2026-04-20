@@ -1,0 +1,122 @@
+package com.example.demo.Service
+
+import com.example.demo.JwtRefreshException
+import com.example.demo.Model.JwtAuthenticationDto
+import com.example.demo.Model.Role
+import com.example.demo.Model.TokenData
+import io.jsonwebtoken.Claims
+import io.jsonwebtoken.ExpiredJwtException
+import io.jsonwebtoken.JwtException
+import io.jsonwebtoken.Jwts
+import io.jsonwebtoken.io.Decoders
+import io.jsonwebtoken.security.Keys
+import org.springframework.beans.factory.annotation.Value
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
+import org.springframework.stereotype.Component
+import java.time.Duration
+import java.time.Instant
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.util.Date
+import javax.crypto.SecretKey
+
+@Component
+class JwtService{
+    companion object {
+       private val log : Logger = LoggerFactory.getLogger(JwtService::class.java)
+        private val ACCESS_TOKEN_DURATION = Duration.ofMinutes(10)
+        private val REFRESH_TOKEN_DURATION = Duration.ofDays(30)
+        private const val REFRESH_RENEW_THRESHOLD_DAYS = 7L
+
+        private const val CLAIM_USER_ID = "userId"
+        private const val CLAIM_ROLES = "roles"
+        private const val CLAIM_IS_ENABLED = "isEnabled"
+        private const val CLAIM_IS_ACCOUNT_NON_LOCKED = "isAccountNonLocked"
+    }
+    @Value("\${jwt.secret}")
+    private lateinit var jwtSecret : String
+
+    fun generatePairToken(tokenData : TokenData): JwtAuthenticationDto =
+        JwtAuthenticationDto(
+            accessToken = buildAccessToken(tokenData),
+            refreshToken = buildRefreshToken(tokenData.email)
+        )
+
+    private fun buildAccessToken(tokenData: TokenData): String {
+        val now = Instant.now()
+        return Jwts.builder()
+            .setSubject(tokenData.email)
+            .setIssuedAt(Date.from(now))
+            .setExpiration(Date.from(now.plus(ACCESS_TOKEN_DURATION))) // ← ACCESS не REFRESH
+            .claim(CLAIM_USER_ID, tokenData.id)
+            .claim(CLAIM_ROLES, tokenData.roles.map { it.name })
+            .claim(CLAIM_IS_ENABLED, tokenData.isEnabled)
+            .claim(CLAIM_IS_ACCOUNT_NON_LOCKED, tokenData.isAccountNonLocked)
+            .signWith(signingKey())
+            .compact()
+    }
+
+    private fun buildRefreshToken(email: String): String {
+        val now = Instant.now()
+        return Jwts.builder()
+            .setSubject(email)
+            .setIssuedAt(Date.from(now))
+            .setExpiration(Date.from(now.plus(REFRESH_TOKEN_DURATION)))
+            .signWith(signingKey())
+            .compact()
+    }
+
+    private fun parseClaims(token : String) : Claims {
+        return Jwts.parserBuilder()
+            .setSigningKey(signingKey())
+            .build()
+            .parseClaimsJwt(token)
+        .body
+    }
+    private fun parseClaimsOrThrowRefresh(token: String): Claims = try {
+        parseClaims(token)
+    } catch (e: ExpiredJwtException) {
+        throw JwtRefreshException("Refresh-токен истёк", e)
+    } catch (e: JwtException) {
+        throw JwtRefreshException("Refresh-токен невалиден", e)
+    }
+
+
+    private fun extractRoles(claims : Claims): Set<Role> {
+        val rolesNames = claims.get(CLAIM_ROLES,List :: class.java) as? List<String>
+        if (rolesNames.isNullOrEmpty()) {
+            return emptySet()
+        }
+        return rolesNames.map { Role.valueOf(it) }.toSet()
+    }
+
+
+    private fun signingKey(): SecretKey {
+        val keyBytes = Decoders.BASE64.decode(jwtSecret)
+        return Keys.hmacShaKeyFor(keyBytes)
+    }
+
+
+    private fun generateJwtToken(
+        userId: Long,
+        email: String,
+        roles : Set<Role>,
+        isEnabled : Boolean,
+        isAccountNonLocked : Boolean
+    ) : String {
+        val expectation = Date.from(
+            LocalDateTime.now()
+                .plusMinutes(15)
+                .atZone(ZoneId.systemDefault()).toInstant())
+        return Jwts.builder()
+            .setSubject(email)
+            .setExpiration(expectation)
+            .claim(CLAIM_USER_ID, userId)
+            .claim(CLAIM_ROLES , roles.map { it.name })
+            .claim(CLAIM_IS_ENABLED , isEnabled)
+            .claim(CLAIM_IS_ACCOUNT_NON_LOCKED , isAccountNonLocked)
+            .signWith(signingKey()).compact()
+    }
+
+}
