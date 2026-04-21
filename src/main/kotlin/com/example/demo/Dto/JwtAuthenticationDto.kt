@@ -1,4 +1,4 @@
-package com.example.demo.Model
+package com.example.demo.Dto
 
 data class JwtAuthenticationDto(
     val accessToken: String,

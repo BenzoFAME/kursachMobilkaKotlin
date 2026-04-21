@@ -1,19 +1,23 @@
-package com.example.demo.Service
+package com.example.demo.Security
 
+import com.example.demo.Dto.JwtAuthenticationDto
+import com.example.demo.Dto.RefreshTokenDto
 import com.example.demo.JwtRefreshException
-import com.example.demo.Model.JwtAuthenticationDto
 import com.example.demo.Model.Role
 import com.example.demo.Model.TokenData
 import io.jsonwebtoken.Claims
 import io.jsonwebtoken.ExpiredJwtException
 import io.jsonwebtoken.JwtException
 import io.jsonwebtoken.Jwts
+import io.jsonwebtoken.MalformedJwtException
+import io.jsonwebtoken.UnsupportedJwtException
 import io.jsonwebtoken.io.Decoders
 import io.jsonwebtoken.security.Keys
-import org.springframework.beans.factory.annotation.Value
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
+import java.security.SignatureException
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDateTime
@@ -37,11 +41,80 @@ class JwtService{
     @Value("\${jwt.secret}")
     private lateinit var jwtSecret : String
 
+
+
     fun generatePairToken(tokenData : TokenData): JwtAuthenticationDto =
         JwtAuthenticationDto(
             accessToken = buildAccessToken(tokenData),
             refreshToken = buildRefreshToken(tokenData.email)
         )
+
+
+
+
+    fun refreshTokens(tokenData : TokenData,
+                      refreshTokenDto: RefreshTokenDto
+    ) : JwtAuthenticationDto {
+        val refreshToken = refreshTokenDto.refreshToken
+        val claims = parseClaimsOrThrowRefresh(refreshToken)
+        val daysLeft = Duration.between(Instant.now() , claims.expiration.toInstant()).toDays()
+        val newRefreshToken =
+            if (daysLeft < REFRESH_RENEW_THRESHOLD_DAYS)
+                buildRefreshToken(claims.subject)
+            else refreshToken
+        return JwtAuthenticationDto(
+            accessToken = buildAccessToken(tokenData),
+            refreshToken = newRefreshToken
+        )
+    }
+    fun refreshBaseToken(
+        userId: Long,
+        email: String,
+        roles: Set<Role>,
+        isEnabled: Boolean,
+        isAccountNonLocked: Boolean,
+        refreshToken: String
+    ): JwtAuthenticationDto = JwtAuthenticationDto(
+        accessToken = generateJwtToken(userId, email, roles, isEnabled, isAccountNonLocked),
+        refreshToken = refreshToken
+    )
+    fun validateToken(token: String): Boolean {
+        return try {
+            parseClaims(token)
+            true
+        } catch (e: ExpiredJwtException)      { log.warn("JWT истёк: {}", e.message); false }
+        catch (e: UnsupportedJwtException)  { log.warn("JWT не поддерживается: {}", e.message); false }
+        catch (e: MalformedJwtException)    { log.warn("JWT повреждён: {}", e.message); false }
+        catch (e: SignatureException)       { log.warn("JWT неверная подпись: {}", e.message); false }
+        catch (e: IllegalArgumentException) { log.warn("JWT null: {}", e.message); false }
+    }
+
+    fun extractTokenData(token: String): TokenData {
+        val claims = parseClaims(token)
+        return TokenData(
+            id = claims.get(CLAIM_USER_ID, Long::class.java),
+            email = claims.subject,
+            roles = extractRoles(claims),
+            isEnabled = claims.get(CLAIM_IS_ENABLED, Boolean::class.java),
+            isAccountNonLocked = claims.get(CLAIM_IS_ACCOUNT_NON_LOCKED, Boolean::class.java)
+        )
+    }
+    fun extractEmail(token: String): String = parseClaims(token).subject
+
+    fun validateRefreshToken(refreshTokenDto: RefreshTokenDto, expectedEmail: String) {
+        val claims = parseClaimsOrThrowRefresh(refreshTokenDto.refreshToken)
+        if (expectedEmail != claims.subject)
+            throw JwtRefreshException("Refresh токен не принадлежит пользователю: $expectedEmail")
+    }
+    fun extractExpiration(token: String): Date = parseClaims(token).expiration
+
+    fun millisUntilExpiry(token: String): Long =
+        parseClaims(token).expiration.toInstant().toEpochMilli() - Instant.now().toEpochMilli()
+
+    fun isTokenExpired(token: String): Boolean = try {
+        parseClaims(token).expiration.before(Date())
+    } catch (e: ExpiredJwtException) { true }
+
 
     private fun buildAccessToken(tokenData: TokenData): String {
         val now = Instant.now()
@@ -71,7 +144,7 @@ class JwtService{
         return Jwts.parserBuilder()
             .setSigningKey(signingKey())
             .build()
-            .parseClaimsJwt(token)
+            .parseClaimsJws(token)
         .body
     }
     private fun parseClaimsOrThrowRefresh(token: String): Claims = try {

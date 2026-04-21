@@ -27,6 +27,8 @@ data class User(
     val password: String,
     val email: String,
     val createdAt: Instant = Instant.now(),
+    val isEnabled: Boolean = true,           // ← добавь
+    val isAccountNonLocked: Boolean = true,
 
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "user_roles", joinColumns = [JoinColumn(name = "user_id")])
