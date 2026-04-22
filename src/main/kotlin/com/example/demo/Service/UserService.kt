@@ -7,7 +7,7 @@ import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
 
 @Service
-class UserService(private val passwordEncoder: PasswordEncoder,
+class UserService(
     private val repository: UserRepository) {
     fun findByEmail(email: String): User =
         repository.findByEmail(email) ?: throw UsernameNotFoundException("User not found")

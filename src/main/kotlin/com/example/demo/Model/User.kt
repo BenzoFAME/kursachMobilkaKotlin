@@ -13,6 +13,7 @@ import jakarta.persistence.Id
 import jakarta.persistence.JoinColumn
 import jakarta.persistence.Table
 import lombok.Data
+import org.springframework.security.core.userdetails.UserDetails
 import java.time.Instant
 
 @Entity
