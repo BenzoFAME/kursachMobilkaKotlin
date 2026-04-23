@@ -16,8 +16,12 @@ class PostService (private val postRepository: PostRepository,
 
     fun getByChannel(channelId: Long): List<PostDto>  = postRepository.findByChannelId(channelId).map { it.toDto() }
 
-    fun createPost(channelId: Long, request: CreatePostRequest): PostDto {
+    fun createPost(channelId: Long, request: CreatePostRequest , ownerEmail : String): PostDto {
         val channel = channelRepository.findById(channelId).orElseThrow { RuntimeException("Channel not found") }
+
+        if (channel.owner.email != ownerEmail){
+            throw RuntimeException("Owner email does not match owner")
+        }
         val post = Post(
             id =0,
             content = request.content,
@@ -25,15 +29,19 @@ class PostService (private val postRepository: PostRepository,
         )
         return postRepository.save(post).toDto()
     }
-    fun deletePost(postId: Long) {
-        if (!postRepository.existsById(postId)) {
-            throw RuntimeException("Post not found")
-        }
+    fun deletePost(postId: Long, ownerEmail: String) {
+        val post = postRepository.findById(postId)
+            .orElseThrow { RuntimeException("Post not found") }
+        if (post.channelName.owner.email != ownerEmail)
+            throw RuntimeException("Только владелец канала может удалять посты")
         postRepository.deleteById(postId)
     }
 
-    fun updatePost(postId: Long , request: CreatePostRequest): PostDto {
-        val post = postRepository.findById(postId).orElseThrow { RuntimeException("Post not found") }
+    fun updatePost(postId: Long, request: CreatePostRequest, ownerEmail: String): PostDto {
+        val post = postRepository.findById(postId)
+            .orElseThrow { RuntimeException("Post not found") }
+        if (post.channelName.owner.email != ownerEmail)
+            throw RuntimeException("Только владелец канала может редактировать посты")
         post.content = request.content
         return postRepository.save(post).toDto()
     }
