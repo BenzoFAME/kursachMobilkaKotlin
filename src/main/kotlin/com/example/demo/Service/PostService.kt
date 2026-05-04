@@ -8,14 +8,15 @@ import com.example.demo.Repository.ChannelRepository
 import com.example.demo.Repository.PostRepository
 import jakarta.persistence.EntityNotFoundException
 import jakarta.persistence.Id
+import jakarta.transaction.Transactional
 import org.springframework.stereotype.Service
 
 @Service
 class PostService (private val postRepository: PostRepository,
                    private val channelRepository: ChannelRepository,) {
-
-    fun getByChannel(channelId: Long): List<PostDto>  = postRepository.findByChannelId(channelId).map { it.toDto() }
-
+    @Transactional
+    fun getByChannel(channelId: Long): List<PostDto>  = postRepository.findByChannelName_Id(channelId).map { it.toDto() }
+    @Transactional
     fun createPost(channelId: Long, request: CreatePostRequest , ownerEmail : String): PostDto {
         val channel = channelRepository.findById(channelId).orElseThrow { RuntimeException("Channel not found") }
 
@@ -29,6 +30,7 @@ class PostService (private val postRepository: PostRepository,
         )
         return postRepository.save(post).toDto()
     }
+    @Transactional
     fun deletePost(postId: Long, ownerEmail: String) {
         val post = postRepository.findById(postId)
             .orElseThrow { RuntimeException("Post not found") }
@@ -36,7 +38,7 @@ class PostService (private val postRepository: PostRepository,
             throw RuntimeException("Только владелец канала может удалять посты")
         postRepository.deleteById(postId)
     }
-
+    @Transactional
     fun updatePost(postId: Long, request: CreatePostRequest, ownerEmail: String): PostDto {
         val post = postRepository.findById(postId)
             .orElseThrow { RuntimeException("Post not found") }

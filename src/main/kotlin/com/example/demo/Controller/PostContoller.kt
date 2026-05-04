@@ -3,6 +3,7 @@ package com.example.demo.Controller
 import com.example.demo.Dto.ChannelDto
 import com.example.demo.Dto.CreatePostRequest
 import com.example.demo.Dto.PostDto
+import com.example.demo.Model.TokenData
 import com.example.demo.Service.PostService
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -29,9 +30,9 @@ class PostContoller(private val postService: PostService) {
     fun createPost(
         @PathVariable channelId: Long,
         @RequestBody request: CreatePostRequest,
-        @AuthenticationPrincipal user: UserDetails
+        @AuthenticationPrincipal tokenData: TokenData
     ): ResponseEntity<PostDto> {
-        val result = postService.createPost(channelId, request, user.username)
+        val result = postService.createPost(channelId, request, tokenData.email)
         return ResponseEntity.status(HttpStatus.CREATED).body(result)
     }
 
@@ -39,9 +40,9 @@ class PostContoller(private val postService: PostService) {
     @DeleteMapping("/{id}")
     fun deletePost(
         @PathVariable id: Long,
-        @AuthenticationPrincipal user: UserDetails
+        @AuthenticationPrincipal tokenData: TokenData
     ): ResponseEntity<Void> {
-        postService.deletePost(id, user.username)
+        postService.deletePost(id, tokenData.email)
         return ResponseEntity.noContent().build()
     }
 
@@ -49,9 +50,9 @@ class PostContoller(private val postService: PostService) {
     fun updatePost(
         @PathVariable id: Long,
         @RequestBody request: CreatePostRequest,
-        @AuthenticationPrincipal user: UserDetails
+        @AuthenticationPrincipal tokenData: TokenData
     ): ResponseEntity<PostDto> {
-        val updated = postService.updatePost(id, request, user.username)
+        val updated = postService.updatePost(id, request, tokenData.email)
         return ResponseEntity.ok(updated)
     }
 }

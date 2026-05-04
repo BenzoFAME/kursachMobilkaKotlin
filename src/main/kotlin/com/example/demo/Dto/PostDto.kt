@@ -5,4 +5,5 @@ data class PostDto(
     val content: String,
     val createdAt: String,
     val channelName: String,
+    val commentDto : MutableList<CommentDto> = mutableListOf()
 )

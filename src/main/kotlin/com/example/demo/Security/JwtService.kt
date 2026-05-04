@@ -92,11 +92,11 @@ class JwtService{
     fun extractTokenData(token: String): TokenData {
         val claims = parseClaims(token)
         return TokenData(
-            id = claims.get(CLAIM_USER_ID, Long::class.java),
+            id = (claims[CLAIM_USER_ID] as Number).toLong(),
             email = claims.subject,
             roles = extractRoles(claims),
-            isEnabled = claims.get(CLAIM_IS_ENABLED, Boolean::class.java),
-            isAccountNonLocked = claims.get(CLAIM_IS_ACCOUNT_NON_LOCKED, Boolean::class.java)
+            isEnabled = claims[CLAIM_IS_ENABLED] as Boolean,
+            isAccountNonLocked = claims[CLAIM_IS_ACCOUNT_NON_LOCKED] as Boolean
         )
     }
     fun extractEmail(token: String): String = parseClaims(token).subject

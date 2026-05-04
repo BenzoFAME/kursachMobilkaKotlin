@@ -26,7 +26,7 @@ data class Channel(
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "owner_id")
     val owner : User,
-    @OneToMany(mappedBy = "channel", cascade = [CascadeType.ALL], orphanRemoval = true)
+    @OneToMany(mappedBy = "channelName", cascade = [CascadeType.ALL], orphanRemoval = true)
     val posts: MutableList<Post> = mutableListOf(),
 
     @ManyToMany

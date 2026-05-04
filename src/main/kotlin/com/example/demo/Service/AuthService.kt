@@ -7,6 +7,7 @@ import com.example.demo.Dto.RegisterUser
 import com.example.demo.Security.JwtService
 import com.example.demo.mapper.toTokenData
 import com.example.demo.mapper.toUser
+import jakarta.transaction.Transactional
 import org.springframework.security.authentication.BadCredentialsException
 import org.springframework.security.authentication.DisabledException
 import org.springframework.security.crypto.password.PasswordEncoder
@@ -17,7 +18,7 @@ class AuthService(private val passwordEncoder: PasswordEncoder ,
     private val userService: UserService ,
     private val jwtService: JwtService
 ) {
-
+        @Transactional
     fun createUser(registerUser: RegisterUser) : JwtAuthenticationDto {
         if (userService.exitstByEmail(registerUser.email)) {
             throw IllegalArgumentException("User already exists")
@@ -30,7 +31,7 @@ class AuthService(private val passwordEncoder: PasswordEncoder ,
             passwordEncoder.encode(registerUser.password)))
         return jwtService.generatePairToken(user.toTokenData())
     }
-
+        @Transactional
     fun loginUser(loginUser: LoginUser): JwtAuthenticationDto {
         var user = userService.findByEmail(loginUser.email)
         if (!passwordEncoder.matches(loginUser.password, user.password)) {
@@ -41,7 +42,7 @@ class AuthService(private val passwordEncoder: PasswordEncoder ,
         }
         return jwtService.generatePairToken(user.toTokenData())
     }
-
+        @Transactional
     fun refreshToken(refreshToken: RefreshTokenDto): JwtAuthenticationDto {
         val email = jwtService.extractEmail(refreshToken.refreshToken)
         val user = userService.findByEmail(email)
